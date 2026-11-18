@@ -58,13 +58,14 @@ provided, applies delta rules for changed files.
 
 ```
 usage: lizard-to-code-quality [--csv FILE] [--base-csv FILE] [--out FILE]
-                               [--ccn-minor N] [--ccn-major N]
+                               [--ccn-minor N] [--ccn-major N] [--fail-on-issues]
 
   --csv FILE      lizard CSV input (default: lizard_report.csv)
   --base-csv FILE lizard CSV for merge base from lizard-base (enables delta reporting)
   --out FILE      Code Quality JSON output (default: gl-code-quality-report.json)
   --ccn-minor N   CCN threshold for flagging a function (default: 30)
   --ccn-major N   CCN threshold for major severity (default: 60)
+  --fail-on-issues  Exit 1 when the report lists any issue, after writing it
 ```
 
 ## GitLab CI example
@@ -93,12 +94,19 @@ check-complexity:
           --ccn-major "${CCN_MAJOR}"
       fi
   artifacts:
+    when: always
     reports:
       codequality: gl-code-quality-report.json
   rules:
     - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 ```
+
+To make the job a gate, pass `--fail-on-issues` to both `lizard-to-code-quality`
+calls. The report is written before the job fails, and `when: always` uploads it
+anyway, so the MR widget still shows what to fix. On an MR the report includes
+functions still over the threshold in unchanged files, so the gate only fits a
+codebase that is already under it.
 
 ## License
 

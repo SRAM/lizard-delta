@@ -1,7 +1,8 @@
 import hashlib
 import json
+import sys
 
-from lizard_delta.lizard_to_code_quality import convert
+from lizard_delta.lizard_to_code_quality import convert, main
 
 # Two classes in one file overriding the same signature (e.g. two Kotlin data
 # classes each with a hand-written `equals(other: Any?)`). lizard's long_name
@@ -79,3 +80,38 @@ def test_threshold_and_severity(tmp_path):
     assert set(by_line) == {11, 21}
     assert by_line[11]["severity"] == "minor"
     assert by_line[21]["severity"] == "major"
+
+
+def run_main(monkeypatch, tmp_path, csv_text, *extra_args):
+    csv_path = tmp_path / "lizard_report.csv"
+    csv_path.write_text(csv_text)
+    json_path = tmp_path / "out.json"
+    monkeypatch.setattr(sys, "argv", [
+        "lizard-to-code-quality", "--csv", str(csv_path), "--out", str(json_path),
+        "--ccn-minor", "15", "--ccn-major", "30", *extra_args,
+    ])
+    try:
+        main()
+        code = 0
+    except SystemExit as exit_:
+        code = exit_.code
+    return code, json.loads(json_path.read_text())
+
+
+def test_fail_on_issues_exits_nonzero_after_writing_report(monkeypatch, tmp_path):
+    code, issues = run_main(monkeypatch, tmp_path, COLLIDING_ROWS, "--fail-on-issues")
+    assert code == 1
+    assert len(issues) == 1
+
+
+def test_fail_on_issues_passes_when_report_is_empty(monkeypatch, tmp_path):
+    rows = '11,8,88,1,14,"equals@70-83@a/B.kt","a/B.kt","equals","equals other : Any?",70,83\n'
+    code, issues = run_main(monkeypatch, tmp_path, rows, "--fail-on-issues")
+    assert code == 0
+    assert issues == []
+
+
+def test_issues_do_not_fail_without_the_flag(monkeypatch, tmp_path):
+    code, issues = run_main(monkeypatch, tmp_path, COLLIDING_ROWS)
+    assert code == 0
+    assert len(issues) == 1

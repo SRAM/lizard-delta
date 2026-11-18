@@ -171,6 +171,7 @@ def convert(csv_path, json_path, base_csv_path=None, ccn_minor=30, ccn_major=60)
     if threshold_count - worsened_count > 0:
         parts.append(f"{threshold_count - worsened_count} function(s) exceed CCN threshold of {ccn_minor}")
     print(", ".join(parts) + " — see gl-code-quality-report.json" if parts else "No complexity issues found")
+    return issues
 
 
 def main():
@@ -208,8 +209,15 @@ def main():
         dest="ccn_major",
         help="CCN at which severity escalates to major (default: 60)",
     )
+    parser.add_argument(
+        "--fail-on-issues",
+        action="store_true",
+        help="exit 1 when the report lists any issue (the report is still written first)",
+    )
     args = parser.parse_args()
-    convert(args.csv_path, args.json_path, args.base_csv_path, args.ccn_minor, args.ccn_major)
+    issues = convert(args.csv_path, args.json_path, args.base_csv_path, args.ccn_minor, args.ccn_major)
+    if args.fail_on_issues and issues:
+        sys.exit(1)
 
 
 if __name__ == "__main__":
